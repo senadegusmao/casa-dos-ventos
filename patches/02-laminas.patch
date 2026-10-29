@@ -1,0 +1,116 @@
+diff --git a/effect.wgsl b/effect.wgsl
+index 1465c54..57b5887 100644
+--- a/effect.wgsl
++++ b/effect.wgsl
+@@ -1009,6 +1009,8 @@ fn vgBladeSpace(p: vec2<f32>, t: f32) -> vec2<f32> {
+ // The three blades over `base`: colour in .rgb, combined coverage in .a.
+ fn vgBladeStack(q: vec2<f32>, base: vec3<f32>, t: f32) -> vec4<f32> {
+   var acc = vec4<f32>(base, 0.0);
++  // Colour A's alpha carries the blades switch: 0 leaves the glass empty.
++  if (u.colorA.a < 0.5) { return acc; }
+   acc = vgBlade(q, acc, t, 0.0,
+                 vec2<f32>(-0.928677, 0.118293), vec2<f32>(-0.284653, 0.206517), vec2<f32>(0.512039, 0.268012),
+                 vec4<f32>(0.144534, 0.118998, 1.812845, 0.372606), vec4<f32>(1.040714, 1.0, 0.072713, 0.0548), 0.019496,
+diff --git a/src/App.tsx b/src/App.tsx
+index 71c09ea..385c518 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -394,6 +394,9 @@ function readEditorStateFromHash(): OrbEditorState {
+   const glass = search.get("glass");
+   if (glass === "1") params.glassEnabled = true;
+   if (glass === "0") params.glassEnabled = false;
++  const blades = search.get("blades");
++  if (blades === "1") params.bladesEnabled = true;
++  if (blades === "0") params.bladesEnabled = false;
+ 
+   for (const spec of numericSpecs) {
+     const raw = search.get(spec.key);
+@@ -475,6 +478,7 @@ function writeHash(
+   search.set("effect", "orb-glass-liquid");
+   search.set("style", params.style);
+   search.set("glass", params.glassEnabled ? "1" : "0");
++  search.set("blades", params.bladesEnabled ? "1" : "0");
+   search.set("state", activeState);
+   search.set("activation", String(configuration.activationDuration));
+   search.set("transition", String(configuration.transitionDuration));
+@@ -1103,10 +1107,23 @@ export function App(): React.JSX.Element {
+               {renderSlider("metalEvolution")}
+               {renderSlider("particleDensity")}
+               {renderSlider("ribbonCount")}
+-              {renderSlider("ribbonWidth")}
+-              {renderSlider("ribbonTwist")}
+-              {renderSlider("ribbonFold")}
+-              {renderSlider("ribbonBreath")}
++              {params.style === "verdantGlass" ? (
++                <div className="glass-switch">
++                  <Switch
++                    checked={params.bladesEnabled}
++                    name={copy.showBlades}
++                    onCheckedChange={(checked) => setParam("bladesEnabled", checked)}
++                  />
++                </div>
++              ) : null}
++              {params.style !== "verdantGlass" || params.bladesEnabled ? (
++                <>
++                  {renderSlider("ribbonWidth")}
++                  {renderSlider("ribbonTwist")}
++                  {renderSlider("ribbonFold")}
++                  {renderSlider("ribbonBreath")}
++                </>
++              ) : null}
+               {renderSlider("particleSize")}
+               {renderSlider("particleBloom")}
+             </PanelSection>
+diff --git a/src/editor-i18n.ts b/src/editor-i18n.ts
+index 103b239..6346255 100644
+--- a/src/editor-i18n.ts
++++ b/src/editor-i18n.ts
+@@ -220,6 +220,7 @@ export const uiCopy = {
+     shapeSection: "Forma e Movimento",
+     glassSection: "Vidro",
+     enableGlass: "Ativar vidro",
++    showBlades: "Mostrar lâminas",
+     edgeSection: "Borda e Brilho",
+     copyFailed: "Falha ao copiar",
+     exportPng: "Exportar PNG 4K",
+@@ -283,6 +284,7 @@ export const uiCopy = {
+     shapeSection: "Shape Motion",
+     glassSection: "Glass Shell",
+     enableGlass: "Enable Glass Shell",
++    showBlades: "Show Blades",
+     edgeSection: "Edge & Glow",
+     copyFailed: "Copy Failed",
+     exportPng: "Export PNG 4K",
+diff --git a/src/orb-uniforms.ts b/src/orb-uniforms.ts
+index 1491e74..9a1bb31 100644
+--- a/src/orb-uniforms.ts
++++ b/src/orb-uniforms.ts
+@@ -101,6 +101,8 @@ export function writeOrbUniforms(
+     ...paletteStops,
+   ];
+   colors.forEach((hex, index) => target.set(rgb(hex), orbColorOffset + index * 4));
++  // Colour A's alpha is the Verdant Glass blades switch (1 shown, 0 hidden).
++  target[orbColorOffset + 3] = params.bladesEnabled ? 1 : 0;
+ }
+ 
+ export function createOrbUniformSnapshot(params: OrbParams): number[] {
+diff --git a/src/presets.ts b/src/presets.ts
+index 3777285..e716fe4 100644
+--- a/src/presets.ts
++++ b/src/presets.ts
+@@ -17,6 +17,7 @@ export type StyleName =
+ export type OrbParams = {
+   style: StyleName;
+   glassEnabled: boolean;
++  bladesEnabled: boolean;
+   speed: number;
+   radius: number;
+   contourDeform: number;
+@@ -74,6 +75,7 @@ type StylePreset = Omit<OrbParams, "style">;
+ 
+ const basePreset: StylePreset = {
+   glassEnabled: true,
++  bladesEnabled: true,
+   speed: 1,
+   radius: 0.72,
+   contourDeform: 0,

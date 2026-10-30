@@ -32,7 +32,12 @@ jobs:
           cd editor
           git checkout 8d1736e
           base64 -d ../site.patch.gz.b64 | gunzip | git apply
-          for p in ../patches/*.patch; do git apply "$p"; done
+          for p in ../patches/*; do
+            case "$p" in
+              *.gz.b64) base64 -d "$p" | gunzip | git apply ;;
+              *.patch) git apply "$p" ;;
+            esac
+          done
 
       - name: Instalar pnpm
         uses: pnpm/action-setup@v6
